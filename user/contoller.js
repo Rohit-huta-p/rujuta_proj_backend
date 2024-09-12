@@ -90,21 +90,36 @@ const fetchUserDetails = (req, res) => {
     }
 }
 
-const addToCart = async( req, res) => {
-    const {productId} = req.body;
-    const {userId} = req.user;
+const addToCart = async (req, res) => {
+    const { productId } = req.body;
+    const { userId } = req.user;
 
-    const user = await UserModel.findById(userId)
-    if(!user){
-        return res.status(404).json({error: 'User not found'});
+    try {
+        // Find the user by userId
+        const user = await UserModel.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Check if the product is already in the user's cart
+        const productInCart = user.cart.find(item => item.productId.toString() === productId.toString());
+        if (productInCart) {
+            return res.status(400).json({ message: 'Product is already in the cart' });
+        }
+
+        // Add the product to the user's cart
+        user.cart.push({ productId });
+        
+        // Save the user after adding the product
+        await user.save();
+
+        return res.status(200).json({ message: 'Product added to cart' });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: 'Internal server error' });
     }
+};
 
-
-    user.cart.push({ productId});
-    
-    await user.save();
-    return res.status(200).json({message: 'Product added to cart'});
-}
 
 const fetchCartItems = async (req, res) => {
     const {userId} = req.user;
@@ -152,4 +167,31 @@ const fetchorders = async (req, res) => {
         return res.status(200).json({orders: user.orders});
     }
 }
-module.exports = {login, register, logout, fetchUserDetails, addToCart, fetchCartItems, placeOrder, fetchorders}
+
+
+const removeCartItem = async (req, res) => {
+    try {
+        const userId = req.user._id; 
+        const productId = req.body; 
+
+
+        const user = await UserModel.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+
+        user.cart = user.cart.filter(item => item.productId !== Number(productId));
+
+
+        await user.save();
+
+        res.status(200).json({ message: 'Item removed from cart', cart: user.cart });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+module.exports = {login, register, logout, fetchUserDetails, addToCart, fetchCartItems, removeCartItem, placeOrder, fetchorders}
